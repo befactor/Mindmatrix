@@ -38,6 +38,9 @@ export default function Nav() {
                   <Link href="/admin/content" onClick={() => setOpen(false)}>
                     المحتوى
                   </Link>
+                  <Link href="/admin/subjects" onClick={() => setOpen(false)}>
+                    إدارة المواد
+                  </Link>
                 </>
               )}
               <Link href="/dashboard" onClick={() => setOpen(false)}>
@@ -45,6 +48,9 @@ export default function Nav() {
               </Link>
               <Link href="/learn" onClick={() => setOpen(false)}>
                 موادي
+              </Link>
+              <Link href="/account" onClick={() => setOpen(false)}>
+                الحساب
               </Link>
               <button onClick={() => signOut({ callbackUrl: "/" })} className="nav-link-btn">
                 تسجيل خروج

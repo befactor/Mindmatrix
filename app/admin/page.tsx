@@ -22,6 +22,13 @@ type AdminSlot = {
   isBooked: boolean;
   subject: { name: string };
 };
+type Stats = {
+  totalStudents: number;
+  byStatus: Record<string, number>;
+  confirmedRevenue: number;
+  confirmedCount: number;
+  upcomingSlotCount: number;
+};
 
 export default function AdminPage() {
   const { data: session, status } = useSession();
@@ -30,6 +37,7 @@ export default function AdminPage() {
   const [bookings, setBookings] = useState<AdminBooking[]>([]);
   const [slots, setSlots] = useState<AdminSlot[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
 
@@ -48,16 +56,18 @@ export default function AdminPage() {
   }, [status, session, router]);
 
   async function refresh() {
-    const [bRes, sRes, subRes] = await Promise.all([
+    const [bRes, sRes, subRes, statsRes] = await Promise.all([
       fetch("/api/admin/bookings"),
       fetch("/api/admin/slots"),
       fetch("/api/subjects"),
+      fetch("/api/admin/stats"),
     ]);
     setBookings(await bRes.json());
     setSlots(await sRes.json());
     const subs = await subRes.json();
     setSubjects(subs);
     if (subs.length > 0 && !subjectId) setSubjectId(subs[0].id);
+    setStats(await statsRes.json());
     setLoading(false);
   }
 
@@ -119,6 +129,30 @@ export default function AdminPage() {
         <div className="page-head">
           <h1>لوحة الإدارة</h1>
         </div>
+
+        {stats && (
+          <div className="grid grid-3" style={{ marginBottom: 24 }}>
+            <div className="card">
+              <div style={{ fontSize: 12, color: "var(--muted)", fontWeight: 700 }}>عدد الطلاب</div>
+              <div style={{ fontSize: 26, fontWeight: 800, color: "var(--navy-deep)", marginTop: 6 }}>
+                {stats.totalStudents}
+              </div>
+            </div>
+            <div className="card">
+              <div style={{ fontSize: 12, color: "var(--muted)", fontWeight: 700 }}>الدخل المؤكد</div>
+              <div style={{ fontSize: 26, fontWeight: 800, color: "var(--navy-deep)", marginTop: 6 }}>
+                {stats.confirmedRevenue} د.أ
+              </div>
+              <div style={{ fontSize: 12, color: "var(--muted)" }}>{stats.confirmedCount} حجز مؤكد</div>
+            </div>
+            <div className="card">
+              <div style={{ fontSize: 12, color: "var(--muted)", fontWeight: 700 }}>مواعيد متاحة قادمة</div>
+              <div style={{ fontSize: 26, fontWeight: 800, color: "var(--navy-deep)", marginTop: 6 }}>
+                {stats.upcomingSlotCount}
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="admin-panel">
           <div className="card">
