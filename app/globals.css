@@ -76,6 +76,7 @@ img { max-width: 100%; display: block; }
 .hero-blob-2 { width: 280px; height: 280px; background: #3b82f6; bottom: -120px; inset-inline-start: -60px; opacity: 0.25; }
 .hero-inner { max-width: 1080px; margin: 0 auto; padding: 0 20px; text-align: center; position: relative; z-index: 1; }
 .hero-grid { display: grid; grid-template-columns: 1.1fr 0.9fr; align-items: center; gap: 40px; text-align: start; }
+.hero-grid > * { min-width: 0; }
 .hero-grid .eyebrow, .hero-grid .hero-ctas { justify-content: flex-start; }
 @media (max-width: 860px) {
   .hero-grid { grid-template-columns: 1fr; text-align: center; }
@@ -106,7 +107,8 @@ img { max-width: 100%; display: block; }
 .hero-float-card .hero-float-sub { color: var(--muted); font-size: 11px; margin-top: 2px; }
 .hero-float-card-2 { top: 4px; bottom: auto; inset-inline-start: auto; inset-inline-end: -24px; }
 @media (max-width: 860px) {
-  .hero-float-card { position: static; margin: 10px auto 0; max-width: 260px; }
+  .hero-visual { flex-direction: column; }
+  .hero-float-card { position: static; margin: 10px auto 0; max-width: 260px; width: 100%; }
 }
 
 .highlight-card { display: flex; gap: 16px; align-items: flex-start; }
