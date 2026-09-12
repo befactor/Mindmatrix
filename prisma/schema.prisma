@@ -1,0 +1,205 @@
+// MindMatrix Academy — Prisma schema
+// Postgres (Supabase in production, matching the Wajbti deployment pattern).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------- Auth (NextAuth Prisma adapter shape) ----------
+
+enum Role {
+  STUDENT
+  ADMIN
+}
+
+model User {
+  id           String  @id @default(cuid())
+  name         String?
+  email        String? @unique
+  phone        String?
+  image        String?
+  passwordHash String? // set for email/password sign-up (the only method for now)
+  role         Role    @default(STUDENT)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  accounts Account[]
+  sessions Session[]
+  bookings Booking[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ---------- Academy domain ----------
+
+// Curriculum track a subject belongs to — drives the "IB / SAT" headline
+// focus plus the rest of the catalog carried over from the center's bio.
+enum Track {
+  IB
+  SAT
+  AP
+  IGCSE
+  BTEC
+  EST
+}
+
+model Subject {
+  id          String  @id @default(cuid())
+  track       Track
+  name        String // e.g. "IB Business Management (SL/HL)"
+  slug        String  @unique
+  description String?
+  priceJod    Decimal @db.Decimal(10, 2) // price per session, in JOD
+  active      Boolean @default(true)
+  sortOrder   Int     @default(0)
+
+  slots        AvailabilitySlot[]
+  bookings     Booking[]
+  contentItems ContentItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// A single bookable time slot. One slot -> at most one booking (capacity 1
+// tutor per slot for the MVP — one-to-one sessions).
+model AvailabilitySlot {
+  id        String   @id @default(cuid())
+  subjectId String
+  startsAt  DateTime
+  endsAt    DateTime
+  isBooked  Boolean  @default(false)
+
+  subject Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  booking Booking?
+
+  createdAt DateTime @default(now())
+
+  @@index([subjectId, startsAt])
+}
+
+enum BookingStatus {
+  PENDING_PAYMENT // slot reserved, waiting for the student to submit CliQ proof
+  AWAITING_CONFIRMATION // proof submitted, waiting for admin to confirm
+  CONFIRMED // admin confirmed the CliQ transfer — session is on
+  REJECTED // admin rejected the proof (wrong amount, no match, etc.)
+  CANCELLED // student or admin cancelled before payment
+}
+
+model Booking {
+  id        String        @id @default(cuid())
+  userId    String
+  subjectId String
+  slotId    String        @unique
+  status    BookingStatus @default(PENDING_PAYMENT)
+  notes     String? // optional note from the student when booking
+
+  user    User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subject Subject          @relation(fields: [subjectId], references: [id])
+  slot    AvailabilitySlot @relation(fields: [slotId], references: [id])
+  payment Payment?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+// Manual CliQ payment proof — no live gateway integration; the student
+// reports what they sent and an admin verifies it against the bank app
+// before confirming the booking. See README for the full flow.
+model Payment {
+  id              String   @id @default(cuid())
+  bookingId       String   @unique
+  amountJod       Decimal  @db.Decimal(10, 2)
+  cliqReference   String // transaction/reference number the student got from their bank app
+  senderName      String? // name the transfer shows as, to help matching
+  proofNote       String? // anything else the student wants to add
+  reviewedBy      String? // admin user id who confirmed/rejected
+  reviewedAt      DateTime?
+  rejectionReason String?
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+}
+
+// ---------- Protected content (preview-only, watermarked) ----------
+//
+// There is no way for a website to truly block a screenshot or a phone
+// photographing the screen — see README for the full explanation. What
+// this model supports instead is the same approach real streaming/e-learning
+// platforms use: content is never exposed as a plain downloadable file, and
+// every view is watermarked with the viewing student's identity so a leaked
+// copy is traceable back to them.
+
+enum ContentType {
+  VIDEO
+  PDF
+}
+
+model ContentItem {
+  id        String      @id @default(cuid())
+  subjectId String
+  type      ContentType
+  title     String
+
+  // VIDEO: an external, ideally token-protected/expiring embed URL (e.g. a
+  // Bunny Stream or Vimeo private link) — never a raw downloadable file.
+  videoUrl String?
+
+  // PDF: stored as raw bytes in the database (not a public static file) so
+  // every fetch goes through the entitlement-checked API route below and is
+  // rendered client-side to a watermarked <canvas>, never opened in the
+  // browser's native PDF viewer (which would offer its own download/print).
+  pdfData     Bytes?
+  pdfMime     String? @default("application/pdf")
+  pdfFilename String?
+
+  subject Subject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([subjectId])
+}
